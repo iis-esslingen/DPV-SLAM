@@ -24,21 +24,6 @@ from pathlib import Path
 import json
 
 
-SEQUENCES = {
-    "kwald/drosselweg/flaeche1": [
-        "2023-08-18", "2023-09-15", "2024-01-13", "2024-04-11", "2024-05-29_1", "2024-05-29_2", "2024-05-29_3", "2024-05-29_4"],
-    "kwald/drosselweg/flaeche2": [
-        "2023-08-18", "2023-12-21", "2024-01-13", "2024-04-11", "2024-05-29_1", "2024-05-30_1", "2024-05-30_2"],
-    "esslingen/hse_dach": [
-        "2023-07-20", "2023-11-07", "2024-01-27", "2024-04-14"],
-    "esslingen/hse_hinterhof": [
-        "2023-07-31", "2023-11-07", "2024-04-14", "2024-05-08", "2024-05-13_1", "2024-05-13_2", "2024-05-24_2"],
-    "esslingen/hse_sporthalle": [
-        "2023-09-11", "2023-11-23", "2024-02-19", "2024-04-14", "2024-05-07", "2024-05-08_1", "2024-05-08_2", "2024-05-24_1"],
-}
-
-CAMERAS = ["d435i", "pi_cam_02"]
-
 SKIP = 0
 
 def show_image(image, t=0):
@@ -122,7 +107,7 @@ def run(cfg, network, datapath, camera, stride=1, viz=False):
 
     return slam.terminate()
 
-def evaluate(traj_est, datapath, outputpath, camera, stride):
+def evaluate(traj_est, datapath, outputpath, ground_truth_path, camera, stride):
 
     if camera == "t265":
         image_dir = os.path.join(datapath, "cam_left")
@@ -137,60 +122,49 @@ def evaluate(traj_est, datapath, outputpath, camera, stride):
         orientations_quat_wxyz=traj_est[:,3:],
         timestamps=np.array(tstamps))
 
-    result_path = os.path.join(outputpath)
-    Path(result_path).mkdir(parents=True, exist_ok=True)
+    Path(outputpath).mkdir(parents=True, exist_ok=True)
     result_file_name = f"{camera}_slam_trajectory.txt"
-    file_interface.write_tum_trajectory_file(os.path.join(result_path, f"{camera}_slam_trajectory.txt"), traj_est_fused)
+    file_interface.write_tum_trajectory_file(os.path.join(outputpath, f"{camera}_slam_trajectory.txt"), traj_est_fused)
     
-    gt_file = os.path.join(datapath, 'groundtruth.txt')
-    traj_ref = file_interface.read_tum_trajectory_file(gt_file)
+    traj_ref = file_interface.read_tum_trajectory_file(ground_truth_path)
 
     traj_ref, traj_est = sync.associate_trajectories(traj_ref, traj_est_fused)
 
     result_ape = main_ape.ape(traj_ref, traj_est, est_name='traj', 
         pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
 
-    with open(os.path.join(result_path, result_file_name.replace("slam_trajectory", "ape_results")), "w") as file:
+    with open(os.path.join(outputpath, result_file_name.replace("slam_trajectory", "ape_results")), "w") as file:
         file.write(json.dumps(result_ape.stats))
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_data_path", type=Path)
-    parser.add_argument("--base_output_path", type=Path)
+    parser.add_argument("--data_path", type=Path)
+    parser.add_argument("--ground_truth_path", type=Path)
+    parser.add_argument("--output_path", type=Path)
+    parser.add_argument("--camera", type=str, choices=["d435i", "t265", "pi_cam"])
     parser.add_argument('--network', type=str, default='dpvo.pth')
     parser.add_argument('--config', default="config/default.yaml")
     parser.add_argument('--stride', type=int, default=2)
-    parser.add_argument('--viz', action="store_true")
-    # parser.add_argument('--trials', type=int, default=1)
-    parser.add_argument('--plot', action="store_true")
+    parser.add_argument('--trials', type=int, default=1)
+    # parser.add_argument('--viz', action="store_true")
+    # parser.add_argument('--plot', action="store_true")
     args = parser.parse_args()
 
     cfg.merge_from_file(args.config)
 
     print("\nRunning with config...")
     print(cfg, "\n")
-
-    errors = dict()
     
-    for location, dates in SEQUENCES.items():
-        for date in dates:
-            for camera in CAMERAS:
-                print(f"Running Location: {location} - Date: {date} - Camera: {camera}")
-            
-                for trial in range(1,6):
-                    print(f"\tTrial: {trial}")
-                    main_seed = int(time.time())
-                    torch.manual_seed(main_seed)
-                    
-                    datapath = os.path.join(args.base_data_path, location, date, "tum", camera)
+    for trial in range(args.trials):
+        print(f"Trial: {trial}")
+        main_seed = int(time.time())
+        torch.manual_seed(main_seed)
+        
+        datapath = os.path.join(args.base_data_path, args.camera)
 
-                    try:
-                        traj_est, timestamps = run(cfg, args.network, datapath, camera, args.stride, args.viz)
+        traj_est, timestamps = run(cfg, args.network, datapath, args.camera, args.stride, args.viz)
 
-                        outputpath = os.path.join(args.base_output_path, location, date, camera, str(trial))
-                        evaluate(traj_est=traj_est, datapath=datapath, outputpath=outputpath, camera=camera, stride=args.stride)
-                    except Exception as e:
-                        print(e)
-                        errors[f"{location} - {date}"] =  str(e)
+        outputpath = os.path.join(args.output_path, args.camera, str(trial))
+        evaluate(traj_est, datapath, outputpath, args.ground_truth_path, args.camera, args.stride)
