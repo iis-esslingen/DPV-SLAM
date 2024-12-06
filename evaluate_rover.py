@@ -164,7 +164,7 @@ if __name__ == '__main__':
         
         datapath = os.path.join(args.base_data_path, args.camera)
 
-        traj_est, timestamps = run(cfg, args.network, datapath, args.camera, args.stride, args.viz)
+        traj_est, timestamps = run(cfg, args.network, datapath, args.camera, args.stride)
 
         outputpath = os.path.join(args.output_path, args.camera, str(trial))
         evaluate(traj_est, datapath, outputpath, args.ground_truth_path, args.camera, args.stride)
