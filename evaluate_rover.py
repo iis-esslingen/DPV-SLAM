@@ -140,7 +140,7 @@ def evaluate(traj_est, datapath, outputpath, ground_truth_path, camera, stride):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=Path)
+    parser.add_argument("--base_data_path", type=Path)
     parser.add_argument("--ground_truth_path", type=Path)
     parser.add_argument("--output_path", type=Path)
     parser.add_argument("--camera", type=str, choices=["d435i", "t265", "pi_cam"])
