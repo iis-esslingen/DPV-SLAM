@@ -149,7 +149,7 @@ if __name__ == '__main__':
     parser.add_argument('--stride', type=int, default=2)
     parser.add_argument('--trials', type=int, default=1)
     parser.add_argument('--opts', nargs='+', default=[])
-    parser.add_argument('--save_trajectory', action="store_true")
+    parser.add_argument('--backend_thresh', type=float, default=64.0)
     # parser.add_argument('--viz', action="store_true")
     # parser.add_argument('--plot', action="store_true")
     args = parser.parse_args()
