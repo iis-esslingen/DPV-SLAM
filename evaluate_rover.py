@@ -155,6 +155,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cfg.merge_from_file(args.config)
+    cfg.BACKEND_THRESH = args.backend_thresh
     cfg.merge_from_list(args.opts)
 
     print("\nRunning with config...")
